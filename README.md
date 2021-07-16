@@ -27,6 +27,11 @@ const sameMessage = c.decode(generate(struct), enc)
 
 `struct` should be an object of field names and their corresponding compact encodings.
 
+To specify and array encoding simply pass `[encoding]` in place of `encoding`, eg.
+```{
+  length: [c.uint]
+}
+```
 
 Returns compact encodings for `struct`:
 ```

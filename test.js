@@ -45,3 +45,31 @@ test('generate encoding', t => {
 
   t.end()
 })
+
+test('array encoding', t => {
+  const struct = {
+    length: [c.uint]
+  }
+
+  const cstruct = generate(struct)
+
+  const test = {
+    length: [176, 23, 14, 37, 3485792]
+  }
+
+  const enc = c.encode(cstruct, test)
+  t.same(test, c.decode(cstruct, enc), 'simple')
+
+  const nested = {
+    nest: [cstruct]
+  }
+
+  const testNest = {
+    nest: [test, { length: [123, 456, 789] }]
+  }
+
+  const nestenc = c.encode(generate(nested), testNest)
+  t.same(testNest, c.decode(generate(nested), nestenc), 'nested')
+
+  t.end()
+})
