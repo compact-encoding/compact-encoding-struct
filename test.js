@@ -73,3 +73,52 @@ test('array encoding', t => {
 
   t.end()
 })
+
+test('optional encoding', t => {
+  const struct = {
+    _length: c.uint,
+    width: c.uint,
+    memo: c.string
+  }
+
+  const cstruct = generate(struct)
+
+  const test = {
+    width: 32,
+    memo: 'test without optional'
+  }
+
+  const enc = c.encode(cstruct, test)
+  t.same(test, c.decode(cstruct, enc), 'without optional')
+
+  const testWith = {
+    length: 32,
+    width: 32,
+    memo: 'test with optional'
+  }
+
+  const encWith = c.encode(cstruct, testWith)
+  t.same(testWith, c.decode(cstruct, encWith), 'with optional')
+
+  const nested = {
+    _length: [c.uint],
+    _nest: cstruct
+  }
+
+  const testNest = {
+    nest: testWith
+  }
+
+  const nestenc = c.encode(generate(nested), testNest)
+  t.same(testNest, c.decode(generate(nested), nestenc), 'nested')
+
+  const testNestWith = {
+    length: [32, 362, 217, 8329],
+    nest: test
+  }
+
+  const nestencWith = c.encode(generate(nested), testNestWith)
+  t.same(testNestWith, c.decode(generate(nested), nestencWith), 'nested')
+
+  t.end()
+})
