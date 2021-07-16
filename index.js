@@ -2,33 +2,39 @@ const c = require('compact-encoding')
 
 module.exports = function (struct) {
   function preencode (state, msg) {
-    for (const [field, cenc] of Object.entries(struct)) {
-      if (Array.isArray(cenc)) {
-        c.array(cenc[0]).preencode(state, msg[field])
-      } else {
-        cenc.preencode(state, msg[field])
+    for (let [field, cenc] of Object.entries(struct)) {
+      let nest = 0
+      while (Array.isArray(cenc)) {
+        cenc = cenc[0]
+        nest++
       }
+      for (let i = 0; i < nest; i++) cenc = c.array(cenc)
+      cenc.preencode(state, msg[field])
     }
   }
 
   function encode (state, msg) {
-    for (const [field, cenc] of Object.entries(struct)) {
-      if (Array.isArray(cenc)) {
-        c.array(cenc[0]).encode(state, msg[field])
-      } else {
-        cenc.encode(state, msg[field])
+    for (let [field, cenc] of Object.entries(struct)) {
+      let nest = 0
+      while (Array.isArray(cenc)) {
+        cenc = cenc[0]
+        nest++
       }
+      for (let i = 0; i < nest; i++) cenc = c.array(cenc)
+      cenc.encode(state, msg[field])
     }
   }
 
-  function decode (state, msg) {
+  function decode (state) {
     const ret = {}
-    for (const [field, cenc] of Object.entries(struct)) {
-      if (Array.isArray(cenc)) {
-        ret[field] = c.array(cenc[0]).decode(state)
-      } else {
-        ret[field] = cenc.decode(state)
+    for (let [field, cenc] of Object.entries(struct)) {
+      let nest = 0
+      while (Array.isArray(cenc)) {
+        cenc = cenc[0]
+        nest++
       }
+      for (let i = 0; i < nest; i++) cenc = c.array(cenc)
+      ret[field] = cenc.decode(state)
     }
     return ret
   }
