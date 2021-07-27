@@ -1,8 +1,8 @@
 const c = require('compact-encoding')
-const generate = require('./')
+const { compile, opt, array, flag } = require('./')
 const test = require('tape')
 
-test('generate encoding', t => {
+test('compile encoding', t => {
   const struct = {
     start: c.uint,
     length: c.uint,
@@ -11,7 +11,7 @@ test('generate encoding', t => {
     signature: c.fixed64
   }
 
-  const cstruct = generate(struct)
+  const cstruct = compile(struct)
 
   const test = {
     start: 12,
@@ -40,8 +40,8 @@ test('generate encoding', t => {
     signature: Buffer.alloc(64, 1)
   }
 
-  const nestenc = c.encode(generate(nested), testNest)
-  t.same(testNest, c.decode(generate(nested), nestenc), 'nested')
+  const nestenc = c.encode(compile(nested), testNest)
+  t.same(testNest, c.decode(compile(nested), nestenc), 'nested')
 
   t.end()
 })
@@ -51,7 +51,7 @@ test('array encoding', t => {
     length: [c.uint]
   }
 
-  const cstruct = generate(struct)
+  const cstruct = compile(struct)
 
   const test = {
     length: [176, 23, 14, 37, 3485792]
@@ -68,20 +68,64 @@ test('array encoding', t => {
     nest: [test, { length: [123, 456, 789] }]
   }
 
-  const nestenc = c.encode(generate(nested), testNest)
-  t.same(testNest, c.decode(generate(nested), nestenc), 'nested')
+  const nestenc = c.encode(compile(nested), testNest)
+  t.same(testNest, c.decode(compile(nested), nestenc), 'nested')
+
+  t.end()
+})
+
+test('flag encoding', t => {
+  const struct = {
+    1: flag,
+    2: flag,
+    3: flag,
+    4: flag,
+    5: flag
+  }
+
+  const cstruct = compile(struct)
+
+  const test = {
+    1: true,
+    2: false,
+    3: true,
+    4: false,
+    5: false
+  }
+
+  const enc = c.encode(cstruct, test)
+  t.same(enc.byteLength, 3, 'correct length')
+  t.same(c.decode(cstruct, enc), test, 'simple')
+
+  const nested = {
+    nest: [cstruct]
+  }
+
+  const test2 = {
+    1: false,
+    2: false,
+    3: true,
+    4: true,
+    5: false
+  }
+  const testNest = {
+    nest: [test, test2]
+  }
+
+  const nestenc = c.encode(compile(nested), testNest)
+  t.same(c.decode(compile(nested), nestenc), testNest, 'nested')
 
   t.end()
 })
 
 test('optional encoding', t => {
   const struct = {
-    _length: c.uint,
+    length: opt(c.uint),
     width: c.uint,
     memo: c.string
   }
 
-  const cstruct = generate(struct)
+  const cstruct = compile(struct)
 
   const test = {
     width: 32,
@@ -89,7 +133,12 @@ test('optional encoding', t => {
   }
 
   const enc = c.encode(cstruct, test)
-  t.same(test, c.decode(cstruct, enc), 'without optional')
+
+  const exp = {
+    length: null,
+    ...test
+  }
+  t.same(c.decode(cstruct, enc), exp, 'without optional')
 
   const testWith = {
     length: 32,
@@ -98,27 +147,37 @@ test('optional encoding', t => {
   }
 
   const encWith = c.encode(cstruct, testWith)
-  t.same(testWith, c.decode(cstruct, encWith), 'with optional')
+  t.same(c.decode(cstruct, encWith), testWith, 'with optional')
 
   const nested = {
-    _length: [c.uint],
-    _nest: cstruct
+    length: opt(array(c.uint)),
+    nest: opt(cstruct)
   }
 
   const testNest = {
     nest: testWith
   }
 
-  const nestenc = c.encode(generate(nested), testNest)
-  t.same(testNest, c.decode(generate(nested), nestenc), 'nested')
+  const nestenc = c.encode(compile(nested), testNest)
+
+  const testExp = {
+    length: null,
+    ...testNest
+  }
+  t.same(c.decode(compile(nested), nestenc), testExp, 'nested')
 
   const testNestWith = {
     length: [32, 362, 217, 8329],
     nest: test
   }
 
-  const nestencWith = c.encode(generate(nested), testNestWith)
-  t.same(testNestWith, c.decode(generate(nested), nestencWith), 'nested')
+  const nestencWith = c.encode(compile(nested), testNestWith)
+
+  const testNestExp = {
+    length: [32, 362, 217, 8329],
+    nest: exp
+  }
+  t.same(testNestExp, c.decode(compile(nested), nestencWith), 'nested')
 
   t.end()
 })

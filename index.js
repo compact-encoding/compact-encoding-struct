@@ -1,94 +1,59 @@
 const c = require('compact-encoding')
-const Bitfield = require('bitfield').default
+const bitfield = require('./bitfield')
 
-module.exports = function (struct) {
-  const optionals = Object.keys(struct).filter(isOptional)
+module.exports = {
+  compile,
+  opt,
+  array
+}
 
+function compile (struct) {
   function preencode (state, msg) {
-    const bitfield = optionals.length ? new Bitfield(optionals.length) : null
-    if (optionals.length) {
-      c.buffer.preencode(state, bitfield.buffer)
+    for (const [field, cenc] of Object.entries(struct)) {
+      const enc = parseArray(cenc)
+      enc.preencode(state, msg[field])
     }
 
-    let count = 0
-    for (let [field, cenc] of Object.entries(struct)) {
-      if (isOptional(field)) {
-        field = field.substring(1)
-        if (!msg[field]) {
-          bitfield.set(count++, false)
-          continue
-        } else {
-          bitfield.set(count++)
-        }
-      }
+    // need to update outer state if nested struct has flags
+    if (!state.flagLen) state.flagLen = 0
+    const flagDiff = bitfield.preencode(state, state.flags, state.flagLen)
+    state.flagLen += flagDiff
 
-      let nest = 0
-      while (Array.isArray(cenc)) {
-        cenc = cenc[0]
-        nest++
-      }
-      for (let i = 0; i < nest; i++) cenc = c.array(cenc)
-      cenc.preencode(state, msg[field])
-    }
+    // same for optionals
+    if (!state.optsLen) state.optsLen = 0
+    const optsDiff = bitfield.preencode(state, state.opts, state.optsLen)
+    state.optsLen += optsDiff
+
+    state.end += flagDiff + optsDiff
   }
 
   function encode (state, msg) {
-    const startIndex = state.start
-
-    const bitfield = optionals.length ? new Bitfield(optionals.length) : null
-    if (optionals.length) c.buffer.encode(state, bitfield.buffer)
-
-    let count = 0
-    for (let [field, cenc] of Object.entries(struct)) {
-      if (isOptional(field)) {
-        field = field.substring(1)
-        if (!msg[field]) {
-          bitfield.set(count++, false)
-          continue
-        } else {
-          bitfield.set(count++)
-        }
-      }
-
-      let nest = 0
-      while (Array.isArray(cenc)) {
-        cenc = cenc[0]
-        nest++
-      }
-      for (let i = 0; i < nest; i++) cenc = c.array(cenc)
-      cenc.encode(state, msg[field])
+    // only need to decode bitfields once
+    if (state.flagLen >= 0) {
+      bitfield.encode(state, state.flags)
+      state.flagLen = -1 // use as flag
     }
 
-    if (optionals.length) {
-      state.start = startIndex
-      c.buffer.encode(state, Buffer.from(bitfield.buffer))
+    if (state.optsLen >= 0) {
+      bitfield.encode(state, state.opts)
+      state.optsLen = -1
+    }
+
+    for (const [field, cenc] of Object.entries(struct)) {
+      const enc = parseArray(cenc)
+      enc.encode(state, msg[field])
     }
   }
 
   function decode (state) {
-    let bitfield
-    let count = 0
-
-    const options = optionals.length ? c.buffer.decode(state) : null
-    if (options) {
-      bitfield = new Bitfield()
-      bitfield.buffer = options
-    }
+    // one bitfield for the entire struct
+    if (!state.flags) state.flags = bitfield.decode(state)
+    if (!state.opts) state.opts = bitfield.decode(state)
 
     const ret = {}
-    for (let [field, cenc] of Object.entries(struct)) {
-      if (isOptional(field)) {
-        if (!bitfield.get(count++)) continue
-        field = field.substring(1)
-      }
-
-      let nest = 0
-      while (Array.isArray(cenc)) {
-        cenc = cenc[0]
-        nest++
-      }
-      for (let i = 0; i < nest; i++) cenc = c.array(cenc)
-      ret[field] = cenc.decode(state)
+    for (const [field, cenc] of Object.entries(struct)) {
+      const enc = parseArray(cenc)
+      ret[field] = enc.decode(state)
     }
     return ret
   }
@@ -100,6 +65,47 @@ module.exports = function (struct) {
   }
 }
 
-function isOptional (key) {
-  return key[0] === '_'
+function opt (enc, defaultVal = null) {
+  const cenc = parseArray(enc)
+  return {
+    preencode (state, opt) {
+      if (!state.opts) state.opts = []
+      state.opts.push(!!opt)
+      if (opt) {
+        cenc.preencode(state, opt)
+      }
+    },
+    encode (state, opt) {
+      if (state.opts.shift()) cenc.encode(state, opt)
+    },
+    decode (state) {
+      if (!state.opts.shift()) return defaultVal
+      return cenc.decode(state)
+    }
+  }
+}
+
+function array (enc) {
+  return [enc]
+}
+
+module.exports.flag = {
+  preencode (state, bool) {
+    if (!state.flags) state.flags = []
+    state.flags.push(bool)
+  },
+  encode () {}, // ignore
+  decode (state) {
+    return state.flags.shift()
+  }
+}
+
+function parseArray (enc) {
+  let nest = 0
+  while (Array.isArray(enc)) {
+    enc = enc[0]
+    nest++
+  }
+  for (let i = 0; i < nest; i++) enc = c.array(enc)
+  return enc
 }
