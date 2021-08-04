@@ -54,6 +54,6 @@ If the field is present it shal be encoded and decoded using compact encoding `e
 
 If the field was not present in the encoded message, the decoded value will be set to `defaultValue`.
 
-#### `{ flag: flag() }`
+#### `{ flag: flag }`
 
-`flag` is a helper function to define flags. The value in the message should be `true`/`false` and will be encoded/decoded using a bitfield to save bytes.
+`flag` is proovided as a compact-encoding defined for flags. The value in the message should be `true`/`false` and will be encoded/decoded using a bitfield to save bytes.
