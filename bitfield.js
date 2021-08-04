@@ -21,7 +21,7 @@ module.exports = {
 
     const bitLen = buf.byteLength << 3
     for (let i = 0; i < bitLen; i++) {
-      const index = i >>> 8
+      const index = i >>> 3
       bits[i] = (buf[index] & (1 << i % 8)) !== 0
     }
     return bits
