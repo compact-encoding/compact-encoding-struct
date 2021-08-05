@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/chm-diederichs/compact-encoding-struct#readme",
   "devDependencies": {
-    "compact-encoding": "^2.1.0",
+    "compact-encoding": "github:chm-diederichs/compact-encoding#float-encoding",
     "standard": "^16.0.3",
     "tape": "^5.2.2"
   },
