@@ -94,7 +94,7 @@ test('flag encoding', t => {
   }
 
   const enc = c.encode(cstruct, test)
-  t.same(enc.byteLength, 3, 'correct length')
+  t.same(enc.byteLength, 2, 'correct length')
   t.same(c.decode(cstruct, enc), test, 'simple')
 
   const nested = {

@@ -98,7 +98,7 @@ module.exports.flag = {
   },
   encode () {}, // ignore
   decode (state, header) {
-    return header.flag.shift()
+    return !!header.flag.shift()
   }
 }
 
