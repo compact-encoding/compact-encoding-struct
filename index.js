@@ -9,52 +9,50 @@ module.exports = {
 
 function compile (struct) {
   function preencode (state, msg) {
+    if (!state.headers) state.headers = []
+    const headerIndex = state.headers.length
+
+    const header = {}
+    header.flag = []
+    header.opt = []
+
     for (const [field, cenc] of Object.entries(struct)) {
       const enc = parseArray(cenc)
-      enc.preencode(state, msg[field])
+      const special = enc.preencode(state, msg[field])
+      if (!special) continue
+      header[special.type].push(special.value)
     }
 
-    // need to update outer state if nested struct has flags
-    if (!state.flagLen) state.flagLen = 0
-    const flagDiff = bitfield.preencode(state, state.flags, state.flagLen)
-    state.flagLen += flagDiff
+    bitfield.preencode(state, header.flag)
+    bitfield.preencode(state, header.opt)
 
-    // same for optionals
-    if (!state.optsLen) state.optsLen = 0
-    const optsDiff = bitfield.preencode(state, state.opts, state.optsLen)
-    state.optsLen += optsDiff
-
-    state.end += flagDiff + optsDiff
+    state.headers.splice(headerIndex, -1, header)
   }
 
   function encode (state, msg) {
-    // only need to decode bitfields once
-    if (state.flagLen >= 0) {
-      bitfield.encode(state, state.flags)
-      state.flagLen = -1 // use as flag
-    }
+    const header = state.headers.shift()
 
-    if (state.optsLen >= 0) {
-      bitfield.encode(state, state.opts)
-      state.optsLen = -1
-    }
+    bitfield.encode(state, header.flag)
+    bitfield.encode(state, header.opt)
 
     for (const [field, cenc] of Object.entries(struct)) {
       const enc = parseArray(cenc)
-      enc.encode(state, msg[field])
+      enc.encode(state, msg[field], header)
     }
   }
 
   function decode (state) {
-    // one bitfield for the entire struct
-    if (!state.flags) state.flags = bitfield.decode(state)
-    if (!state.opts) state.opts = bitfield.decode(state)
+    const header = {
+      flag: bitfield.decode(state),
+      opt: bitfield.decode(state)
+    }
 
     const ret = {}
     for (const [field, cenc] of Object.entries(struct)) {
       const enc = parseArray(cenc)
-      ret[field] = enc.decode(state)
+      ret[field] = enc.decode(state, header)
     }
+
     return ret
   }
 
@@ -69,17 +67,19 @@ function opt (enc, defaultVal = null) {
   const cenc = parseArray(enc)
   return {
     preencode (state, opt) {
-      if (!state.opts) state.opts = []
-      state.opts.push(!!opt)
       if (opt) {
         cenc.preencode(state, opt)
       }
+      return {
+        type: 'opt',
+        value: !!opt
+      }
     },
-    encode (state, opt) {
-      if (state.opts.shift()) cenc.encode(state, opt)
+    encode (state, opt, header) {
+      if (header.opt.shift()) cenc.encode(state, opt)
     },
-    decode (state) {
-      if (!state.opts.shift()) return defaultVal
+    decode (state, header) {
+      if (!header.opt.shift()) return defaultVal
       return cenc.decode(state)
     }
   }
@@ -90,13 +90,15 @@ function array (enc) {
 }
 
 module.exports.flag = {
-  preencode (state, bool) {
-    if (!state.flags) state.flags = []
-    state.flags.push(bool)
+  preencode (state, bool, flags) {
+    return {
+      type: 'flag',
+      value: bool
+    }
   },
   encode () {}, // ignore
-  decode (state) {
-    return state.flags.shift()
+  decode (state, header) {
+    return header.flag.shift()
   }
 }
 
