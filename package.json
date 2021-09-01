@@ -1,6 +1,6 @@
 {
   "name": "compact-encoding-struct",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "generate compact encodings from defined structs",
   "main": "index.js",
   "scripts": {
