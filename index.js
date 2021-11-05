@@ -4,7 +4,8 @@ const bitfield = require('./bitfield')
 module.exports = {
   compile,
   opt,
-  array
+  array,
+  constant
 }
 
 function compile (struct) {
@@ -85,12 +86,30 @@ function opt (enc, defaultVal = null) {
   }
 }
 
+function constant (enc, value) {
+  return {
+    preencode (state) {
+      enc.preencode(state, value)
+    },
+    encode (state) {
+      enc.encode(state, value)
+    },
+    decode (state) {
+      const prop = enc.decode(state)
+      if (!same(prop, value)) {
+        throw new Error(`Expect constant value: ${value}, got ${prop}`)
+      }
+      return value
+    }
+  }
+}
+
 function array (enc) {
   return [enc]
 }
 
 module.exports.flag = {
-  preencode (state, bool, flags) {
+  preencode (state, bool) {
     return {
       type: 'flag',
       value: bool
@@ -110,4 +129,15 @@ function parseArray (enc) {
   }
   for (let i = 0; i < nest; i++) enc = c.array(enc)
   return enc
+}
+
+// only for numbers, strings and buffers
+function same (a, b) {
+  if (typeof a !== typeof b) return false
+  if (typeof a === 'number' || typeof a === 'string') return a === b
+  if (a instanceof Uint8Array) {
+    if (!(b instanceof Uint8Array)) return false
+    return Buffer.compare(a, b) === 0
+  }
+  return false
 }

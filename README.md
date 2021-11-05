@@ -5,9 +5,10 @@ Generate compact encodings from defined structs
 ## Usage
 ```js
 const c = require('compact-encoding')
-const { compile, opt, array, flag } = require('compact-encoding-struct')
+const { compile, opt, array, flag, constant } = require('compact-encoding-struct')
 
 const struct = {
+  type: constant(c.uint, 1),
   start: c.uint,
   length: opt(c.uint),
   nodes: array(c.buffer),
@@ -56,4 +57,10 @@ If the field was not present in the encoded message, the decoded value will be s
 
 #### `{ flag: flag }`
 
-`flag` is proovided as a compact-encoding defined for flags. The value in the message should be `true`/`false` and will be encoded/decoded using a bitfield to save bytes.
+`flag` is a compact-encoding defined for setting flag bits. The value in the message should be `true`/`false` and will be encoded/decoded using a bitfield to save bytes.
+
+#### `{ constant: constant(enc, val) }`
+
+`constant` encodes a fixed value `val` for all messages, even if this field is already set.
+
+It acts as a static property on the encoded/decoded message, decoding will throw if the encoded value does not match the expected value.

@@ -1,5 +1,5 @@
 const c = require('compact-encoding')
-const { compile, opt, array, flag } = require('./')
+const { compile, opt, array, flag, constant } = require('./')
 const test = require('tape')
 
 test('compile encoding', t => {
@@ -178,6 +178,71 @@ test('optional encoding', t => {
     nest: exp
   }
   t.same(testNestExp, c.decode(compile(nested), nestencWith), 'nested')
+
+  t.end()
+})
+
+test('constant encoding', t => {
+  const one = {
+    type: constant(c.uint, 1),
+    width: c.uint,
+    memo: c.string
+  }
+
+  const two = {
+    type: constant(c.string, '2'),
+    width: c.uint,
+    memo: c.string
+  }
+
+  const three = {
+    type: constant(c.buffer, Buffer.alloc(1, 3)),
+    width: c.uint,
+    memo: c.string
+  }
+
+  const cone = compile(one)
+  const ctwo = compile(two)
+  const cthree = compile(three)
+
+  const test = {
+    width: 32,
+    memo: 'test without optional'
+  }
+
+  const eone = c.encode(cone, test)
+  const etwo = c.encode(ctwo, test)
+  const ethree = c.encode(cthree, test)
+
+  const exp1 = {
+    type: 1,
+    ...test
+  }
+
+  const exp2 = {
+    type: '2',
+    ...test
+  }
+
+  const exp3 = {
+    type: Buffer.alloc(1, 3),
+    ...test
+  }
+
+  t.same(c.decode(cone, eone), exp1, 'number')
+  t.same(c.decode(ctwo, etwo), exp2, 'string')
+  t.same(c.decode(cthree, ethree), exp3, 'buffer')
+
+  const typed = {
+    type: Buffer.alloc(32, 3),
+    width: 32,
+    memo: 'test without optional'
+  }
+
+  t.same(c.decode(cone, c.encode(cone, typed)).type, 1, 'with type already set')
+  t.same(c.decode(ctwo, c.encode(ctwo, typed)).type, '2', 'with type already set')
+  t.same(c.decode(cthree, c.encode(cthree, typed)).type, Buffer.alloc(1, 3),
+    'with type already set')
 
   t.end()
 })
