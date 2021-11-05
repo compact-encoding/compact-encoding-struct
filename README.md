@@ -49,7 +49,7 @@ Returns compact encodings for `struct`:
 
 #### `{ optional: opt(enc, [defaultValue = null]) }`
 
-`opt` is a helper function to designate optional fields. 
+`opt` is a helper function to designate optional fields.
 
 If the field is present it shal be encoded and decoded using compact encoding `enc`.
 
@@ -64,3 +64,15 @@ If the field was not present in the encoded message, the decoded value will be s
 `constant` encodes a fixed value `val` for all messages, even if this field is already set.
 
 It acts as a static property on the encoded/decoded message, decoding will throw if the encoded value does not match the expected value.
+
+#### `{ header: header(enc, val) }`
+
+`header` encodes a value in the header at the start of the encoded message.
+
+The header can be fetched at the using the `getHeader` method.
+
+#### getHeader(buf, struct)
+
+This method fetches the header of an encoded message and returns.
+
+`struct` should be an object representing the field names and encodings of the header.

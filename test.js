@@ -1,5 +1,5 @@
 const c = require('compact-encoding')
-const { compile, opt, array, flag, constant } = require('./')
+const { compile, opt, array, flag, constant, header, getHeader } = require('./')
 const test = require('tape')
 
 test('compile encoding', t => {
@@ -94,7 +94,7 @@ test('flag encoding', t => {
   }
 
   const enc = c.encode(cstruct, test)
-  t.same(enc.byteLength, 2, 'correct length')
+  t.same(enc.byteLength, 3, 'correct length')
   t.same(c.decode(cstruct, enc), test, 'simple')
 
   const nested = {
@@ -243,6 +243,64 @@ test('constant encoding', t => {
   t.same(c.decode(ctwo, c.encode(ctwo, typed)).type, '2', 'with type already set')
   t.same(c.decode(cthree, c.encode(cthree, typed)).type, Buffer.alloc(1, 3),
     'with type already set')
+
+  t.end()
+})
+
+test('header encoding', t => {
+  const struct = compile({
+    type: header(c.string),
+    memo: header(c.string),
+    width: c.uint,
+    length: c.uint
+  })
+
+  const sheader = {
+    type: 'memo!',
+    memo: 'hello there!'
+  }
+
+  const test = {
+    ...sheader,
+    width: 32,
+    length: 100
+  }
+
+  const estruct = c.encode(struct, test)
+  const eheader = getHeader(estruct, { type: c.string, memo: c.string })
+
+  t.same(c.decode(struct, estruct), test, 'header')
+  t.same(eheader, sheader, 'get header')
+
+  const nested = compile({
+    memo: header(struct),
+    width: c.uint,
+    length: c.uint
+  })
+
+  const nestTest = {
+    memo: test,
+    width: 52,
+    length: 47
+  }
+
+  const enested = c.encode(nested, nestTest)
+  const nheader = getHeader(enested, { memo: struct })
+
+  t.same(c.decode(nested, enested), nestTest, 'nested header')
+  t.same(nheader.memo, test, 'nested get header')
+
+  const orderTest = {
+    width: 32,
+    length: 100,
+    ...sheader
+  }
+
+  const eorder = c.encode(struct, orderTest)
+  const oheader = getHeader(eorder, { type: c.string, memo: c.string })
+
+  t.same(c.decode(struct, eorder), orderTest, 'order header')
+  t.same(oheader, sheader, 'order get header')
 
   t.end()
 })
