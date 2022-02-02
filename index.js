@@ -37,7 +37,8 @@ function compile (struct) {
     state.headers.splice(headerIndex, -1, header)
 
     // hack cause we don't have buffer at this point
-    c.buffer.preencode(state, { length: header.state.end })
+    c.uint.preencode(state, header.state.end)
+    state.end += header.state.end
   }
 
   function encode (state, msg) {
