@@ -20,8 +20,5 @@
     "compact-encoding": "^2.5.1",
     "standard": "^16.0.3",
     "tape": "^5.2.2"
-  },
-  "dependencies": {
-    "bitfield": "^4.0.0"
   }
 }
