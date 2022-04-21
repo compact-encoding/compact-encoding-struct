@@ -19,6 +19,8 @@ function compile (struct) {
 
     header.flag = []
     header.opt = []
+    header.flags = Object.values(struct)
+      .reduce((acc, v) => acc | v.flags, false)
 
     header.state = {
       start: 0,
@@ -31,26 +33,30 @@ function compile (struct) {
       enc.preencode(state, msg[field], header)
     }
 
-    bitfield.preencode(header.state, header.flag)
-    bitfield.preencode(header.state, header.opt)
+    if (header.flags) {
+      bitfield.preencode(header.state, header.flag)
+      bitfield.preencode(header.state, header.opt)
+
+      // hack cause we don't have buffer at this point
+      c.uint.preencode(state, header.state.end)
+      state.end += header.state.end
+    }
 
     state.headers.splice(headerIndex, -1, header)
-
-    // hack cause we don't have buffer at this point
-    c.uint.preencode(state, header.state.end)
-    state.end += header.state.end
   }
 
   function encode (state, msg) {
     const header = state.headers.shift()
 
-    header.state.buffer = Buffer.alloc(header.state.end)
-
     const headerOffset = state.start
-    c.buffer.encode(state, header.state.buffer)
+    if (header.flags) {
+      header.state.buffer = Buffer.alloc(header.state.end)
 
-    bitfield.encode(header.state, header.flag)
-    bitfield.encode(header.state, header.opt)
+      c.buffer.encode(state, header.state.buffer)
+
+      bitfield.encode(header.state, header.flag)
+      bitfield.encode(header.state, header.opt)
+    }
 
     for (const [field, cenc] of Object.entries(struct)) {
       const enc = parseArray(cenc)
@@ -59,23 +65,33 @@ function compile (struct) {
 
     const finalOffset = state.start
 
-    state.start = headerOffset
-    c.buffer.encode(state, header.state.buffer)
+    if (header.flags) {
+      state.start = headerOffset
+      c.buffer.encode(state, header.state.buffer)
+    }
 
     state.start = finalOffset
   }
 
   function decode (state) {
-    const buffer = c.buffer.decode(state)
+    const flags = Object.values(struct)
+      .reduce((acc, v) => acc | v.flags, false)
 
-    const header = {
-      start: 0,
-      end: buffer.byteLength,
-      buffer
+    let flag = []
+    let opt = []
+    let header
+
+    if (flags) {
+      const buffer = c.buffer.decode(state)
+      header = {
+        start: 0,
+        end: buffer.byteLength,
+        buffer
+      }
+
+      flag = bitfield.decode(header)
+      opt = bitfield.decode(header)
     }
-
-    const flag = bitfield.decode(header)
-    const opt = bitfield.decode(header)
 
     const ret = {}
     for (const [field, cenc] of Object.entries(struct)) {
@@ -116,6 +132,7 @@ function getHeader (buf, struct) {
 function opt (enc, defaultVal = null) {
   const cenc = parseArray(enc)
   return {
+    flags: true,
     preencode (state, opt, header) {
       if (opt) cenc.preencode(header.state, opt)
       header.opt.push(!!opt)
@@ -151,6 +168,7 @@ function constant (enc, value) {
 // this encodes the field in the header
 function header (enc) {
   return {
+    flags: true,
     preencode (state, value, header) {
       enc.preencode(header.state, value)
     },
@@ -168,6 +186,7 @@ function array (enc) {
 }
 
 module.exports.flag = {
+  flags: true,
   preencode (state, bool, header) {
     header.flag.push(bool)
   },

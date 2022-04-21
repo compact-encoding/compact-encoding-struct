@@ -302,5 +302,10 @@ test('header encoding', t => {
   t.same(c.decode(struct, eorder), orderTest, 'order header')
   t.same(oheader, sheader, 'order get header')
 
+  const simple = compile({})
+  const enc = c.encode(simple, {})
+
+  t.equal(enc.byteLength, 0, 'no header')
+
   t.end()
 })
