@@ -65,6 +65,18 @@ If the field was not present in the encoded message, the decoded value will be s
 
 It acts as a static property on the encoded/decoded message, decoding will throw if the encoded value does not match the expected value.
 
+#### `const enc = either(encodings, test)`
+
+`either` encodes a value as one of a set of predefined encodings.
+
+`encodings` should be an array of compact-encodings and `test` should return the index in this array that should be used to encode a value.
+
+```js
+const enc = either([c.string, c.uint], value => {
+  return typeof value === 'string' ? 0 : 1
+})
+````
+
 #### `{ header: header(enc, val) }`
 
 `header` encodes a value in the header at the start of the encoded message.

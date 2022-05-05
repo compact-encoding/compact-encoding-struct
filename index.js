@@ -7,7 +7,8 @@ module.exports = {
   array,
   constant,
   header,
-  getHeader
+  getHeader,
+  either
 }
 
 function compile (struct) {
@@ -174,6 +175,25 @@ module.exports.flag = {
   encode () {}, // ignore
   decode (state, header) {
     return !!header.flag.shift()
+  }
+}
+
+function either (encodings, test) {
+  return {
+    preencode (state, value) {
+      const index = test(value)
+      c.uint.preencode(state, index)
+      encodings[index].preencode(state, value)
+    },
+    encode (state, value) {
+      const index = test(value)
+      c.uint.encode(state, index)
+      encodings[index].encode(state, value)
+    },
+    decode (state) {
+      const index = c.uint.decode(state)
+      return encodings[index].decode(state)
+    }
   }
 }
 

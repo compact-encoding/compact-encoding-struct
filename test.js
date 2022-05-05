@@ -1,5 +1,5 @@
 const c = require('compact-encoding')
-const { compile, opt, array, flag, constant, header, getHeader } = require('./')
+const { compile, opt, array, flag, constant, header, getHeader, either } = require('./')
 const test = require('tape')
 
 test('compile encoding', t => {
@@ -301,6 +301,111 @@ test('header encoding', t => {
 
   t.same(c.decode(struct, eorder), orderTest, 'order header')
   t.same(oheader, sheader, 'order get header')
+
+  t.end()
+})
+
+test('either encoding', t => {
+  const struct = compile({
+    message: either([c.string, c.buffer], b => {
+      return b instanceof Uint8Array ? 1 : 0
+    })
+  })
+
+  const stest = { message: 'hello' }
+  const btest = { message: Buffer.from('world') }
+
+  const sstruct = c.encode(struct, stest)
+  const bstruct = c.encode(struct, btest)
+
+  t.same(c.decode(struct, sstruct), stest, 'string')
+  t.same(c.decode(struct, bstruct), btest, 'buffer')
+
+  const estruct = compile({ type: constant(c.string, 'error'), message: c.string })
+  const vstruct = compile({ type: constant(c.string, 'value'), value: c.buffer })
+
+  const evstruct = either([estruct, vstruct], b => {
+    return ['error', 'value'].indexOf(b.type)
+  })
+
+  const error = {
+    type: 'error',
+    message: 'encode me as a string'
+  }
+
+  const value = {
+    type: 'value',
+    value: Buffer.alloc(4, 1)
+  }
+
+  const etest = c.encode(evstruct, error)
+  const vtest = c.encode(evstruct, value)
+
+  t.same(c.decode(evstruct, etest), error, 'error')
+  t.same(c.decode(evstruct, vtest), value, 'value')
+
+  // test with strange encodings
+  const hstruct = compile({
+    type: header(c.string),
+    memo: header(c.string),
+    width: c.uint,
+    length: c.uint
+  })
+
+  const hnested = compile({
+    type: constant(c.string, 'header'),
+    memo: header(hstruct),
+    width: c.uint,
+    length: c.uint
+  })
+
+  const hnest = {
+    type: 'header',
+    memo: {
+      type: 'memo!',
+      memo: 'hello there!',
+      width: 32,
+      length: 100
+    },
+    width: 52,
+    length: 47
+  }
+
+  const onested = compile({
+    type: constant(c.string, 'opt'),
+    length: opt(array(c.uint)),
+    nest: opt(compile({
+      length: opt(c.uint),
+      width: c.uint,
+      memo: c.string
+    }))
+  })
+
+  const onest = {
+    type: 'opt',
+    nest: {
+      length: 32,
+      width: 32,
+      memo: 'test with optional'
+    }
+  }
+
+  const oexp = {
+    length: null,
+    ...onest
+  }
+
+  const omnistruct = either([estruct, vstruct, hnested, onested], v => {
+    return ['error', 'value', 'header', 'opt'].indexOf(v.type)
+  })
+
+  const htest = c.encode(omnistruct, hnest)
+  const otest = c.encode(omnistruct, onest)
+
+  t.same(c.decode(omnistruct, etest), error, 'error')
+  t.same(c.decode(omnistruct, vtest), value, 'value')
+  t.same(c.decode(omnistruct, htest), hnest, 'header')
+  t.same(c.decode(omnistruct, otest), oexp, 'optional')
 
   t.end()
 })
