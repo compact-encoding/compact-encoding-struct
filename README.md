@@ -73,7 +73,7 @@ It acts as a static property on the encoded/decoded message, decoding will throw
 
 ```js
 const enc = either([c.string, c.uint], value => {
-  return typeof value === string ? 0 : 1
+  return typeof value === 'string' ? 0 : 1
 })
 ````
 
